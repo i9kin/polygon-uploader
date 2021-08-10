@@ -1,5 +1,5 @@
 import subprocess
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
 from pathlib import Path, PosixPath
 from typing import List
 from xml.etree import ElementTree
@@ -109,6 +109,7 @@ def find(headers, header):
     for ind, cur_header in enumerate(headers):
         if cur_header.lower() == header.lower():
             return ind
+    return -1
 
 
 def get_tree(file_path):
@@ -198,15 +199,22 @@ def detect_score(path_to_task):
 def get_dependencies(line, dependency_col):
     # Get dependencies from string line.
     dependencies = []
-    if dependency_col is not None:
-        if '–' in line[dependency_col]:
-            start, end = line[dependency_col].split('–')
+    if dependency_col is None:
+        return []
+
+    cell = line[dependency_col].strip()
+    dashes = ['—', '–']
+    find = False
+    for dash in dashes:
+        if dash in cell:
+            if len(cell) == 1:
+                return []
+            start, end = cell.split(dash)
             dependencies = list(range(start, end + 1))
-        elif line[dependency_col]:
-            dependencies = [
-                int(dependence)
-                for dependence in line[dependency_col].split(',')
-            ]
+            find = true
+            break
+    if not find and cell:
+        dependencies = [int(dependence) for dependence in cell.split(',')]
     return dependencies
 
 
@@ -346,17 +354,24 @@ def choice():
         if (contest_dir / XML_CONTEST_PATH).exists():
             task_names = []
             tree = get_tree(contest_dir / XML_CONTEST_PATH)
+            for problem in tree.findall('problems/problem'):
+                task_names.append(problem.get('url').split('/')[-1])
+            d = defaultdict(list)
+            for task in tasks:
+                d[find(task_names, task.parent.name)].append(task)
+            if d[-1]:
+                choices.append(Separator('tasks that are not related'))
+                choices += cli_choises(d[-1])
+                all_tasks += d[-1]
+                del d[-1]
+
             choices.append(
                 Separator('==' + tree.find('names/name').get('value'))
             )
-            for problem in tree.findall('problems/problem'):
-                task_names.append(problem.get('url').split('/')[-1])
-            tmp = [None for _ in range(len(tasks))]
-            for task in tasks:
-                tmp[find(task_names, task.parent.name)] = task
-            tasks = tmp
-        all_tasks += tasks
-        choices += cli_choises(tasks)
+
+            for _, paths in sorted(d.items()):
+                all_tasks += paths
+                choices += cli_choises(paths)
 
     task_name = select_task(choices)
     for task in all_tasks:

@@ -2,6 +2,8 @@
 
 # polygon-uploader
 
+[![asciicast](https://asciinema.org/a/429897.svg)](https://asciinema.org/a/429897)
+
 Upload polygon packages without headaches
 
 Command-line tool for [polygon](https://polygon.codeforces.com/).
